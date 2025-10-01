@@ -92,6 +92,90 @@ check_prerequisites() {
 	log INFO "Prerequisites OK"
 }
 
+# Generate secure random secrets
+generate_secret() {
+	local length="${1:-32}"
+	# Use openssl if available, otherwise use /dev/urandom
+	if command -v openssl >/dev/null 2>&1; then
+		openssl rand -hex "$((length/2))"
+	else
+		head -c "$length" /dev/urandom | base64 | tr -d '=+/' | head -c "$length"
+	fi
+}
+
+# Generate API key (32 characters)
+generate_api_key() {
+	generate_secret 32
+}
+
+# Generate password (16 characters, alphanumeric)
+generate_password() {
+	if command -v openssl >/dev/null 2>&1; then
+		openssl rand -base64 12 | tr -d '=+/' | head -c 16
+	else
+		head -c 12 /dev/urandom | base64 | tr -d '=+/' | head -c 16
+	fi
+}
+
+# Update environment variable in .env file
+update_env_var() {
+	local env_file="$1"
+	local var_name="$2"
+	local var_value="$3"
+	
+	# Create backup
+	cp "$env_file" "$env_file.bak"
+	
+	# Check if variable already has a real value (not placeholder)
+	local current_value
+	current_value=$(grep "^${var_name}=" "$env_file" | cut -d'=' -f2- || echo "")
+	
+	# Skip if already has a real value (not a placeholder)
+	if [[ -n "$current_value" && "$current_value" != "your_"*"_here" && "$current_value" != "changeme_"* ]]; then
+		log INFO "$var_name already has a value, skipping"
+		return
+	fi
+	
+	# Update the variable
+	if grep -q "^${var_name}=" "$env_file"; then
+		sed -i "s|^${var_name}=.*|${var_name}=${var_value}|" "$env_file"
+	else
+		echo "${var_name}=${var_value}" >> "$env_file"
+	fi
+	log INFO "Generated $var_name"
+}
+
+# Generate all required secrets and update .env file
+generate_and_update_secrets() {
+	local env_file; env_file=$(get_env_file)
+	
+	if [[ ! -f "$env_file" ]]; then
+		log ERROR ".env file not found at $env_file"
+		return 1
+	fi
+	
+	log INFO "Generating secrets and updating .env file..."
+	
+	# Generate API keys (these are typically created by the services themselves, but we'll generate placeholders)
+	update_env_var "$env_file" "SONARR_API_KEY" "$(generate_api_key)"
+	update_env_var "$env_file" "RADARR_API_KEY" "$(generate_api_key)"
+	update_env_var "$env_file" "LIDARR_API_KEY" "$(generate_api_key)"
+	update_env_var "$env_file" "READARR_AUDIO_API_KEY" "$(generate_api_key)"
+	update_env_var "$env_file" "READARR_EBOOKS_API_KEY" "$(generate_api_key)"
+	
+	# Generate database passwords
+	update_env_var "$env_file" "WIKI_DB_PASSWORD" "$(generate_password)"
+	update_env_var "$env_file" "MEALIE_DB_PASSWORD" "$(generate_password)"
+	
+	# Generate Discord token placeholder (user will need to get real token from Discord)
+	update_env_var "$env_file" "DISCORD_TOKEN" "PLACEHOLDER_$(generate_secret 40)_GET_REAL_TOKEN_FROM_DISCORD"
+	
+	log INFO "Secret generation complete!"
+	log WARN "NOTE: API keys are generated as placeholders. The actual API keys will be created by"
+	log WARN "      the services themselves when they first start. Check each service's settings."
+	log WARN "NOTE: DISCORD_TOKEN is a placeholder. Get your real bot token from Discord Developer Portal."
+}
+
 # Function to get compose file (single file for Sullivan)
 get_compose_file() {
     echo "$PROJECT_ROOT/docker-compose.yml"
