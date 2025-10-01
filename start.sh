@@ -182,6 +182,9 @@ generate_and_update_secrets() {
 	update_env_var "$env_file" "WIKI_DB_PASSWORD" "$(generate_password)"
 	update_env_var "$env_file" "MEALIE_DB_PASSWORD" "$(generate_password)"
 	
+	# Generate FileBot password (user remains 'admin')
+	update_env_var "$env_file" "FILEBOT_PASSWORD" "$(generate_password)"
+	
 	# Generate Discord token placeholder (user will need to get real token from Discord)
 	update_env_var "$env_file" "DISCORD_TOKEN" "PLACEHOLDER_$(generate_secret 40)_GET_REAL_TOKEN_FROM_DISCORD"
 	
@@ -256,6 +259,12 @@ DOWNLOAD_PATH_INCOMPLETE=/mnt/media/qbittorrent/incomplete
 SONARR_API_KEY=COPY_FROM_SONARR_SETTINGS_AFTER_STARTUP
 RADARR_API_KEY=COPY_FROM_RADARR_SETTINGS_AFTER_STARTUP
 LIDARR_API_KEY=COPY_FROM_LIDARR_SETTINGS_AFTER_STARTUP
+
+# =============================================================================
+# FILEBOT SETTINGS
+# =============================================================================
+FILEBOT_USER=admin
+FILEBOT_PASSWORD=changeme_filebot_password
 
 # =============================================================================
 # DISCORD/DOPLARR SETTINGS
