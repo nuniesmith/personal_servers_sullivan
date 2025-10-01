@@ -48,6 +48,29 @@ fi
 
 # Source the .env file
 if [ -f .env ]; then
+    echo "Validating .env file syntax..."
+    
+    # Show line 20 specifically since that's where the error was reported
+    echo "Checking .env file line 20:"
+    sed -n '20p' .env | cat -n
+    
+    # Check for basic syntax errors in .env file
+    if ! bash -n .env 2>/dev/null; then
+        echo ""
+        echo "Error: .env file has syntax errors. Common issues:"
+        echo "  - Line starts with a number (variable names can't start with digits)"
+        echo "  - Unquoted values with spaces or special characters"
+        echo "  - Missing quotes around values with spaces/symbols"
+        echo "  - Invalid variable names (must start with letter/underscore)"
+        echo ""
+        echo "Full bash syntax check output:"
+        bash -n .env
+        echo ""
+        echo "Please fix the .env file and run the script again."
+        exit 1
+    fi
+    
+    echo "Syntax validation passed. Sourcing .env file..."
     source .env
     echo "Successfully sourced .env file"
 else
@@ -55,9 +78,15 @@ else
     exit 1
 fi
 
-# Copy .env to /tmp for Stage 2 to access post-reboot
-echo "Copying .env file to /tmp for Stage 2..."
-sudo cp .env /tmp/.env || { echo "Failed to copy .env file"; exit 1; }
+# Set hostname (default to sullivan if not specified in .env)
+HOSTNAME=${HOSTNAME:-sullivan}
+echo "Setting hostname to: $HOSTNAME"
+sudo hostnamectl set-hostname "$HOSTNAME" || { echo "Failed to set hostname"; exit 1; }
+
+# Copy .env to /opt for Stage 2 to access post-reboot (more persistent than /tmp)
+echo "Copying .env file to /opt for Stage 2..."
+sudo mkdir -p /opt/sullivan-setup
+sudo cp .env /opt/sullivan-setup/.env || { echo "Failed to copy .env file"; exit 1; }
 
 # Cache sudo credentials upfront
 echo "Caching sudo credentials..."
@@ -73,7 +102,9 @@ sudo dnf install jq -y || { echo "Failed to install jq"; exit 1; }
 
 # Install Tailscale
 echo "Installing Tailscale..."
-sudo dnf config-manager --add-repo https://pkgs.tailscale.com/stable/fedora/tailscale.repo || { echo "Failed to add Tailscale repo"; exit 1; }
+# Add Tailscale repository
+curl -fsSL https://pkgs.tailscale.com/stable/fedora/repo.gpg | sudo tee /etc/pki/rpm-gpg/tailscale.asc >/dev/null || { echo "Failed to add Tailscale GPG key"; exit 1; }
+curl -fsSL https://pkgs.tailscale.com/stable/fedora/tailscale.repo | sudo tee /etc/yum.repos.d/tailscale.repo || { echo "Failed to add Tailscale repo"; exit 1; }
 sudo dnf install tailscale -y || { echo "Failed to install Tailscale"; exit 1; }
 sudo systemctl enable --now tailscaled || { echo "Failed to enable Tailscale service"; exit 1; }
 
@@ -90,7 +121,17 @@ echo "Installing Docker prerequisites..."
 sudo dnf install dnf-plugins-core -y || { echo "Failed to install dnf-plugins-core"; exit 1; }
 
 echo "Adding Docker repository..."
-sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo || { echo "Failed to add Docker repo"; exit 1; }
+# Add Docker GPG key
+curl -fsSL https://download.docker.com/linux/fedora/gpg | sudo tee /etc/pki/rpm-gpg/docker-ce.asc >/dev/null || { echo "Failed to add Docker GPG key"; exit 1; }
+# Add Docker repository manually
+sudo tee /etc/yum.repos.d/docker-ce.repo > /dev/null <<EOF
+[docker-ce-stable]
+name=Docker CE Stable - \$basearch
+baseurl=https://download.docker.com/linux/fedora/\$releasever/\$basearch/stable
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/docker-ce.asc
+EOF
 
 echo "Installing Docker..."
 sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y || { echo "Failed to install Docker"; exit 1; }
@@ -110,26 +151,46 @@ echo '{"iptables": false}' | sudo tee /etc/docker/daemon.json || { echo "Failed 
 echo "Restarting Docker service..."
 sudo systemctl restart docker || { echo "Failed to restart Docker service"; exit 1; }
 
-# Create Stage 2 script (it will source /tmp/.env)
+# Create Stage 2 script (it will source /opt/sullivan-setup/.env)
 echo "Creating Stage 2 script..."
-cat << 'EOF' | sudo tee /tmp/stage2.sh
+cat << 'EOF' | sudo tee /opt/sullivan-setup/stage2.sh
 #!/bin/bash
 
-# Source the .env file from /tmp
-if [ -f /tmp/.env ]; then
-    source /tmp/.env
+# Add logging for Stage 2
+exec > >(tee -a /var/log/sullivan-setup-stage2.log)
+exec 2>&1
+
+echo "=== Sullivan Setup Stage 2 Started at $(date) ==="
+
+# Source the .env file from /opt/sullivan-setup
+if [ -f /opt/sullivan-setup/.env ]; then
+    source /opt/sullivan-setup/.env
+    echo "Successfully sourced .env file from /opt/sullivan-setup"
 else
-    echo "Error: /tmp/.env file not found. Stage 2 cannot proceed."
+    echo "Error: /opt/sullivan-setup/.env file not found. Stage 2 cannot proceed."
     exit 1
 fi
 
+# Set hostname (default to sullivan if not specified in .env)
+HOSTNAME=${HOSTNAME:-sullivan}
+echo "Using hostname: $HOSTNAME"
+
 # Get Tailscale API access token
+echo "Getting Tailscale API access token..."
 ACCESS_TOKEN=$(curl -s -d "client_id=${TAILSCALE_CLIENT_ID}" \
                     -d "client_secret=${TAILSCALE_CLIENT_SECRET}" \
                     -d "grant_type=client_credentials" \
                     https://api.tailscale.com/api/v2/oauth/token | jq -r .access_token)
 
+if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+    echo "Error: Failed to get Tailscale access token"
+    exit 1
+fi
+
+echo "Successfully obtained Tailscale access token"
+
 # Generate a one-time auth key
+echo "Generating Tailscale auth key..."
 AUTH_KEY=$(curl -s -X POST \
                 -H "Authorization: Bearer ${ACCESS_TOKEN}" \
                 -H "Content-Type: application/json" \
@@ -147,34 +208,53 @@ AUTH_KEY=$(curl -s -X POST \
                     }' \
                 https://api.tailscale.com/api/v2/tailnet/-/keys | jq -r .key)
 
+if [ -z "$AUTH_KEY" ] || [ "$AUTH_KEY" = "null" ]; then
+    echo "Error: Failed to generate Tailscale auth key"
+    exit 1
+fi
+
+echo "Successfully generated Tailscale auth key"
+
 # Authenticate Tailscale
-sudo tailscale up --authkey "${AUTH_KEY}" --hostname "${HOSTNAME}" --accept-routes --advertise-exit-node
+echo "Authenticating with Tailscale..."
+sudo tailscale up --authkey "${AUTH_KEY}" --hostname "${HOSTNAME}" --accept-routes --advertise-exit-node || {
+    echo "Error: Failed to authenticate with Tailscale"
+    exit 1
+}
 
 # Setup basic firewall rules (allow SSH, reload firewalld)
-sudo firewall-cmd --permanent --add-service=ssh
-sudo firewall-cmd --reload
+echo "Configuring firewall..."
+sudo firewall-cmd --permanent --add-service=ssh || echo "Warning: Failed to add SSH service to firewall"
+sudo firewall-cmd --reload || echo "Warning: Failed to reload firewall"
+
+echo "=== Sullivan Setup Stage 2 Complete at $(date) ==="
+echo "Tailscale authentication completed successfully"
 
 # Clean up the one-time service and files
+echo "Cleaning up setup files..."
 sudo systemctl disable setup-stage2.service
-rm /tmp/stage2.sh
-rm /tmp/.env
+rm -rf /opt/sullivan-setup
+echo "Setup cleanup complete"
 EOF
 
 # Make Stage 2 script executable
 echo "Making Stage 2 script executable..."
-sudo chmod +x /tmp/stage2.sh || { echo "Failed to make Stage 2 script executable"; exit 1; }
+sudo chmod +x /opt/sullivan-setup/stage2.sh || { echo "Failed to make Stage 2 script executable"; exit 1; }
 
 # Create one-time systemd service for Stage 2
 echo "Creating systemd service for Stage 2..."
 cat << EOF | sudo tee /etc/systemd/system/setup-stage2.service
 [Unit]
-Description=Setup stage 2 after reboot
-After=network.target tailscaled.service
+Description=Sullivan Setup Stage 2 - Tailscale Configuration
+After=network-online.target tailscaled.service
+Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/tmp/stage2.sh
+ExecStart=/opt/sullivan-setup/stage2.sh
 RemainAfterExit=true
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
