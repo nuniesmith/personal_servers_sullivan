@@ -1,28 +1,119 @@
-# Setup script for a fresh install of Fedora Server 42
+#!/bin/bash
 
-# First fully update the server with dnf, make sure we ask for sudo credentials up front, and once we run this script, we can reboot the system, updates to kernel and other modules need a restart.
-# Sometimes its best to setup firewall rules and other things after fully updating the system and rebooting after the updates. If we need to run tasks after the reboot,
-# we can create a systemd service to run once at boot to finish setup tasks.
+# Setup script for a fresh install of Fedora Server 42
+# This script handles Stage 1: updates, installations, and sets up a one-time systemd service for Stage 2 after reboot.
+# Assumes .env is in the current directory with required secrets.
+
+# Source the .env file
+if [ -f .env ]; then
+    source .env
+else
+    echo "Error: .env file not found in current directory. Please create it with the required variables."
+    exit 1
+fi
+
+# Copy .env to /tmp for Stage 2 to access post-reboot
+sudo cp .env /tmp/.env
+
+# Cache sudo credentials upfront
+sudo -v
+
+# Stage 1: Update the system
 sudo dnf update -y
 
-# Tailscale
+# Install jq for JSON parsing
+sudo dnf install jq -y
 
-sudo dnf config-manager addrepo --from-repofile=https://pkgs.tailscale.com/stable/fedora/tailscale.repo
-sudo dnf install tailscale
+# Install Tailscale
+sudo dnf config-manager --add-repo https://pkgs.tailscale.com/stable/fedora/tailscale.repo
+sudo dnf install tailscale -y
 sudo systemctl enable --now tailscaled
-sudo tailscale up
-tailscale ip -4 = true
-sudo tailscale up --authkey tskey-********** --hostname sullivan --accept-routes --advertise-exit-node
 
-TAILSCALE_CLIENT_ID=kxLeP41NZ921CNTRL
-TAILSCALE_CLIENT_SECRET=tskey-client-kxLeP41NZ921CNTRL-d9iyJEJ4HrL4rJwB5QPrqLtp2xnPUdjVc
+# Install Netdata with claim
+wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --nightly-channel --claim-token "${NETDATA_CLAIM_TOKEN}" --claim-rooms "${NETDATA_CLAIM_ROOMS}" --claim-url "${NETDATA_CLAIM_URL}"
 
-# Setup netdata
-wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --nightly-channel --claim-token Sn5D3zsAEX9KA_YtztxjdHCpan6v-oHfy1OKUrAIGNciXf4T_w0CiqCZc0b7jL7sk_OH8uAA9O7o3Z7XjzHjV8Z2xDySPaSxspzRyb1R3G77mmQVvkCKp5KDHIL9UX7wVDpylrU --claim-rooms 9d87b8a7-72d7-4886-a471-57d2970f9bc2 --claim-url https://app.netdata.cloud
+# Install Docker Engine
+sudo dnf remove docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-selinux docker-engine-selinux docker-engine -y
+sudo dnf install dnf-plugins-core -y
+sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+sudo dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+sudo systemctl enable --now docker
 
-NETDATA_CLAIM_TOKEN=Sn5D3zsAEX9KA_YtztxjdHCpan6v-oHfy1OKUrAIGNciXf4T_w0CiqCZc0b7jL7sk_OH8uAA9O7o3Z7XjzHjV8Z2xDySPaSxspzRyb1R3G77mmQVvkCKp5KDHIL9UX7wVDpylrU
-NETDATA_CLAIM_URL=https://app.netdata.cloud
-NETDATA_CLAIM_ROOMS=9d87b8a7-72d7-4886-a471-57d2970f9bc2
+# Add user to docker group
+sudo groupadd docker || true
+sudo usermod -aG docker "${USER}"
 
-# Docker Engine
+# Configure Docker to not manage iptables (let firewalld handle)
+echo '{"iptables": false}' | sudo tee /etc/docker/daemon.json
+sudo systemctl restart docker
 
+# Create Stage 2 script (it will source /tmp/.env)
+cat << 'EOF' | sudo tee /tmp/stage2.sh
+#!/bin/bash
+
+# Source the .env file from /tmp
+if [ -f /tmp/.env ]; then
+    source /tmp/.env
+else
+    echo "Error: /tmp/.env file not found. Stage 2 cannot proceed."
+    exit 1
+fi
+
+# Get Tailscale API access token
+ACCESS_TOKEN=$(curl -s -d "client_id=${TAILSCALE_CLIENT_ID}" \
+                    -d "client_secret=${TAILSCALE_CLIENT_SECRET}" \
+                    -d "grant_type=client_credentials" \
+                    https://api.tailscale.com/api/v2/oauth/token | jq -r .access_token)
+
+# Generate a one-time auth key
+AUTH_KEY=$(curl -s -X POST \
+                -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d '{
+                      "capabilities": {
+                        "devices": {
+                          "create": {
+                            "reusable": false,
+                            "ephemeral": false,
+                            "preauthorized": true
+                          }
+                        }
+                      },
+                      "expirySeconds": 3600
+                    }' \
+                https://api.tailscale.com/api/v2/tailnet/-/keys | jq -r .key)
+
+# Authenticate Tailscale
+sudo tailscale up --authkey "${AUTH_KEY}" --hostname "${HOSTNAME}" --accept-routes --advertise-exit-node
+
+# Setup basic firewall rules (allow SSH, reload firewalld)
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --reload
+
+# Clean up the one-time service and files
+sudo systemctl disable setup-stage2.service
+rm /tmp/stage2.sh
+rm /tmp/.env
+EOF
+
+# Make Stage 2 script executable
+sudo chmod +x /tmp/stage2.sh
+
+# Create one-time systemd service for Stage 2
+cat << EOF | sudo tee /etc/systemd/system/setup-stage2.service
+[Unit]
+Description=Setup stage 2 after reboot
+After=network.target tailscaled.service
+
+[Service]
+Type=oneshot
+ExecStart=/tmp/stage2.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable the service and reboot
+sudo systemctl enable setup-stage2.service
+sudo reboot
