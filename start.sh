@@ -145,6 +145,23 @@ update_env_var() {
 	log INFO "Generated $var_name"
 }
 
+# Function to extract API key from service logs (future enhancement)
+fetch_api_key_from_logs() {
+	local service_name="$1"
+	local container_name="$2"
+	
+	# This is a placeholder for future implementation
+	# Different ARR services log their API keys in different ways
+	case "$service_name" in
+		sonarr|radarr|lidarr)
+			# Example: docker logs could contain API key information
+			# This would need service-specific parsing logic
+			log INFO "API key extraction from logs not yet implemented for $service_name"
+			log INFO "Please copy manually from $service_name settings"
+			;;
+	esac
+}
+
 # Generate all required secrets and update .env file
 generate_and_update_secrets() {
 	local env_file; env_file=$(get_env_file)
@@ -156,12 +173,10 @@ generate_and_update_secrets() {
 	
 	log INFO "Generating secrets and updating .env file..."
 	
-	# Generate API keys (these are typically created by the services themselves, but we'll generate placeholders)
-	update_env_var "$env_file" "SONARR_API_KEY" "$(generate_api_key)"
-	update_env_var "$env_file" "RADARR_API_KEY" "$(generate_api_key)"
-	update_env_var "$env_file" "LIDARR_API_KEY" "$(generate_api_key)"
-	update_env_var "$env_file" "READARR_AUDIO_API_KEY" "$(generate_api_key)"
-	update_env_var "$env_file" "READARR_EBOOKS_API_KEY" "$(generate_api_key)"
+	# Set API key placeholders (actual keys must be copied from each service's settings after startup)
+	update_env_var "$env_file" "SONARR_API_KEY" "COPY_FROM_SONARR_SETTINGS_AFTER_STARTUP"
+	update_env_var "$env_file" "RADARR_API_KEY" "COPY_FROM_RADARR_SETTINGS_AFTER_STARTUP"
+	update_env_var "$env_file" "LIDARR_API_KEY" "COPY_FROM_LIDARR_SETTINGS_AFTER_STARTUP"
 	
 	# Generate database passwords
 	update_env_var "$env_file" "WIKI_DB_PASSWORD" "$(generate_password)"
@@ -171,8 +186,10 @@ generate_and_update_secrets() {
 	update_env_var "$env_file" "DISCORD_TOKEN" "PLACEHOLDER_$(generate_secret 40)_GET_REAL_TOKEN_FROM_DISCORD"
 	
 	log INFO "Secret generation complete!"
-	log WARN "NOTE: API keys are generated as placeholders. The actual API keys will be created by"
-	log WARN "      the services themselves when they first start. Check each service's settings."
+	log WARN "NOTE: ARR API keys must be copied manually from each service after startup:"
+	log WARN "      - Sonarr: http://localhost:8989/settings/general"
+	log WARN "      - Radarr: http://localhost:7878/settings/general" 
+	log WARN "      - Lidarr: http://localhost:8686/settings/general"
 	log WARN "NOTE: DISCORD_TOKEN is a placeholder. Get your real bot token from Discord Developer Portal."
 }
 
@@ -234,13 +251,11 @@ DOWNLOAD_PATH_COMPLETE=/mnt/media/qbittorrent/complete
 DOWNLOAD_PATH_INCOMPLETE=/mnt/media/qbittorrent/incomplete
 
 # =============================================================================
-# API KEYS (Replace with actual values)
+# API KEYS (Copy from each service's Settings -> General -> API Key after startup)
 # =============================================================================
-SONARR_API_KEY=your_sonarr_api_key_here
-RADARR_API_KEY=your_radarr_api_key_here
-LIDARR_API_KEY=your_lidarr_api_key_here
-READARR_AUDIO_API_KEY=your_readarr_audio_api_key_here
-READARR_EBOOKS_API_KEY=your_readarr_ebooks_api_key_here
+SONARR_API_KEY=COPY_FROM_SONARR_SETTINGS_AFTER_STARTUP
+RADARR_API_KEY=COPY_FROM_RADARR_SETTINGS_AFTER_STARTUP
+LIDARR_API_KEY=COPY_FROM_LIDARR_SETTINGS_AFTER_STARTUP
 
 # =============================================================================
 # DISCORD/DOPLARR SETTINGS
@@ -256,13 +271,16 @@ MEALIE_DB_PASSWORD=changeme_mealie_password
 # =============================================================================
 # WATCHTOWER SETTINGS
 # =============================================================================
-WATCHTOWER_SCHEDULE=0 2 * * *
+WATCHTOWER_SCHEDULE="0 2 * * *"
 WATCHTOWER_NOTIFICATION_URL=
 
 EOF
 
 	log WARN "Basic .env file created. Please update with your actual API keys and passwords!"
 	log INFO "Generated basic .env at $env_file"
+	
+	# Generate secrets automatically
+	generate_and_update_secrets
 }
 
 check_media_paths() {
@@ -560,6 +578,7 @@ Options:
 	--status          Show compose status
 	--logs            Tail logs (Ctrl+C to exit)
 	--no-pull         Do not pull images before start
+	--generate-secrets Generate and update secrets in .env file
 	-h, --help        Show this help
 USAGE
 }
@@ -568,12 +587,13 @@ main() {
 	local do_pull=1 action=start target_service="all"
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
-			--show-env) action=showenv; shift ;;
-			--stop)     action=stop; shift ;;
-			--status)   action=status; shift ;;
-			--logs)     action=logs; shift ;;
-			--no-pull)  do_pull=0; shift ;;
-			-h|--help)  usage; exit 0 ;;
+			--show-env)        action=showenv; shift ;;
+			--stop)            action=stop; shift ;;
+			--status)          action=status; shift ;;
+			--logs)            action=logs; shift ;;
+			--no-pull)         do_pull=0; shift ;;
+			--generate-secrets) action=generate_secrets; shift ;;
+			-h|--help)         usage; exit 0 ;;
 			*) 
 				if [[ " ${SERVICES[*]} all " =~ " $1 " ]]; then
 					target_service="$1"; shift
@@ -588,6 +608,12 @@ main() {
 	case "$action" in
 		showenv)
 			show_environment_info; exit 0 ;;
+		generate_secrets)
+			cd "$PROJECT_ROOT"
+			create_env_files  # Create .env if it doesn't exist
+			generate_and_update_secrets
+			log INFO "Secrets generated and updated in .env file"
+			exit 0 ;;
 	esac
 
 	cd "$PROJECT_ROOT"
