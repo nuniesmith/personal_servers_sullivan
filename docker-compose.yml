@@ -3,10 +3,6 @@
 
 # Named volumes for data/cache/databases only
 volumes:
-  # AI Service volumes
-  ollama_data:
-  openwebui_data:
-  
   # Media Service volumes
   emby_data:
   emby_cache:
@@ -67,48 +63,6 @@ volumes:
 
 services:
   # =============================================================================
-  # AI SERVICES
-  # =============================================================================
-
-  # ollama
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    runtime: runc
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [compute, utility]
-    environment:
-      - TZ=${TZ:-America/Toronto}
-      # - NVIDIA_VISIBLE_DEVICES=all
-    volumes:
-      # DATA: Model data and cache
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    restart: always
-
-  # open webui
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: open_webui
-    depends_on:
-      - ollama
-    environment:
-      - TZ=${TZ:-America/Toronto}
-      - OLLAMA_BASE_URL=http://ollama:11434
-    volumes:
-      # DATA: Application data and user content
-      - openwebui_data:/app/backend/data
-    ports:
-      - "3001:8080"  # Changed from 3000 to avoid conflict with nginx web-interface
-    restart: always
-
-  # =============================================================================
   # MEDIA SERVICES
   # =============================================================================
 
@@ -136,11 +90,12 @@ services:
       # TRANSCODE: Temporary
       - /tmp:/transcode
       # MEDIA: Read-only media files
-      - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies:ro
-      - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows:ro
-      - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music:ro
-      - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos:ro
-      - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu:ro
+      - ${MEDIA_PATH_MOVIES:-/mnt/media/movies}:/movies
+      - ${MEDIA_PATH_SHOWS:-/mnt/media/shows}:/shows
+      - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
+      - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos
+      - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
+      - /mnt/media/docker/emby/backup:/backup
     devices:
       - /dev/dri:/dev/dri
     ports:

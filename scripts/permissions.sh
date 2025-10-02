@@ -1,1 +1,1 @@
-sudo chmod 755 * -Rfv && sudo chown $USER:$USER * -Rfv
+sudo chmod 755 * -Rfv && sudo chown jordan:jordan * -Rfv

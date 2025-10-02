@@ -454,21 +454,6 @@ health_checks() {
 	log INFO "Running quick health checks for ${target_services[*]}..."
 	for service in "${target_services[@]}"; do
 		case "$service" in
-			# AI Services
-			ollama)
-				if curl -fsS http://localhost:11434/api/version >/dev/null 2>&1; then
-					log INFO "Ollama: http://localhost:11434"
-				else
-					log WARN "Ollama not reachable yet"
-				fi
-				;;
-			open-webui)
-				if curl -fsS http://localhost:3001 >/dev/null 2>&1; then
-					log INFO "Open WebUI: http://localhost:3001"
-				else
-					log WARN "Open WebUI not reachable yet"
-				fi
-				;;
 			# Media Services
 			emby)
 				if curl -fsS http://localhost:8096 >/dev/null 2>&1; then
@@ -574,7 +559,6 @@ SULLIVAN startup script - Media & Intensive Services
 
 Usage: $(basename "$0") [options] [service]
 	service: all (default) or specific services like:
-	  AI: ollama, open-webui
 	  Media: emby, jellyfin, plex, audiobookshelf, calibre, calibre-web
 	  Downloads: qbittorrent, jackett, sonarr, radarr, lidarr, readarr.audio, readarr.ebooks
 	  Utils: mealie, wiki, grocy, syncthing, duplicati, filebot-node, ytdl_material
@@ -660,10 +644,6 @@ main() {
 	log INFO "Done. SULLIVAN services started successfully!"
 	echo ""
 	echo "=== Common Service Endpoints ==="
-	echo "AI Services:"
-	echo "  Ollama API:      http://localhost:11434"
-	echo "  Open WebUI:      http://localhost:3001"
-	echo ""
 	echo "Media Servers:"
 	echo "  Emby:            http://localhost:8096"
 	echo "  Jellyfin:        http://localhost:8097"
