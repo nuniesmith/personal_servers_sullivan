@@ -93,7 +93,6 @@ services:
       - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
       - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos
       - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
-      - ${EMBY_BACKUP_PATH:-/mnt/media/backup/emby}:/backup:rw
     devices:
       - /dev/dri:/dev/dri
     ports:
