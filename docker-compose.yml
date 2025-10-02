@@ -52,8 +52,6 @@ volumes:
 #    driver: bridge
 #  books:
 #    driver: bridge
-#  ai:
-#    driver: bridge
 #  database:
 #    driver: bridge
 #  monitoring:
@@ -95,7 +93,7 @@ services:
       - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
       - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos
       - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
-      - /mnt/media/docker/emby/backup:/backup
+      - ${EMBY_BACKUP_PATH:-/mnt/media/backup/emby}:/backup
     devices:
       - /dev/dri:/dev/dri
     ports:
@@ -103,7 +101,7 @@ services:
       - "8920:8920"
     restart: always
 
-  # jellyfin (for testing)
+  # jellyfin
   jellyfin:
     image: lscr.io/linuxserver/jellyfin:latest
     container_name: jellyfin
