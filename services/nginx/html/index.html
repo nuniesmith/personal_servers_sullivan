@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7gram.xyz - Services Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .service-category {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .service-category h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .service-link {
+            display: block;
+            padding: 12px 18px;
+            margin: 8px 0;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .service-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(45deg, #764ba2, #667eea);
+        }
+
+        .service-link .service-name {
+            font-size: 1.1rem;
+            display: block;
+        }
+
+        .service-link .service-desc {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        .server-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4CAF50;
+            margin-right: 8px;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            opacity: 0.8;
+            margin-top: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .services-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌟 7gram.xyz Services</h1>
+            <p>Your Personal Media & Productivity Hub</p>
+        </div>
+
+        <div class="services-grid">
+            <!-- Sullivan Media Services -->
+            <div class="service-category">
+                <h2>📺 Media Services (Sullivan)</h2>
+                <a href="https://emby.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Emby</span>
+                    <span class="service-desc">Media Server & Streaming</span>
+                </a>
+                <a href="https://plex.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Plex</span>
+                    <span class="service-desc">Alternative Media Server</span>
+                </a>
+                <a href="https://jellyfin.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Jellyfin</span>
+                    <span class="service-desc">Open Source Media Server</span>
+                </a>
+                <a href="https://audiobooks.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">AudioBookshelf</span>
+                    <span class="service-desc">Audiobook & Podcast Server</span>
+                </a>
+            </div>
+
+            <!-- Download Management -->
+            <div class="service-category">
+                <h2>⬇️ Download Management</h2>
+                <a href="https://qbt.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">qBittorrent</span>
+                    <span class="service-desc">Torrent Client</span>
+                </a>
+                <a href="https://sonarr.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Sonarr</span>
+                    <span class="service-desc">TV Show Management</span>
+                </a>
+                <a href="https://radarr.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Radarr</span>
+                    <span class="service-desc">Movie Management</span>
+                </a>
+                <a href="https://lidarr.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Lidarr</span>
+                    <span class="service-desc">Music Management</span>
+                </a>
+                <a href="https://jackett.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Jackett</span>
+                    <span class="service-desc">Indexer Manager</span>
+                </a>
+            </div>
+
+            <!-- Books & Knowledge -->
+            <div class="service-category">
+                <h2>📚 Books & Knowledge</h2>
+                <a href="https://calibre-server.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Calibre Server</span>
+                    <span class="service-desc">eBook Library Server</span>
+                </a>
+                <a href="https://calibre.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Calibre Web</span>
+                    <span class="service-desc">Web eBook Reader</span>
+                </a>
+                <a href="https://wiki.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Wiki</span>
+                    <span class="service-desc">Personal Knowledge Base</span>
+                </a>
+            </div>
+
+            <!-- Productivity & Tools -->
+            <div class="service-category">
+                <h2>🛠️ Productivity & Tools</h2>
+                <a href="https://filebot.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">FileBot</span>
+                    <span class="service-desc">Media File Organizer</span>
+                </a>
+                <a href="https://yt.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">YT-DLP Material</span>
+                    <span class="service-desc">YouTube Downloader</span>
+                </a>
+                <a href="https://duplicati.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Duplicati</span>
+                    <span class="service-desc">Backup Solution</span>
+                </a>
+                <a href="https://mealie.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Mealie</span>
+                    <span class="service-desc">Recipe Manager</span>
+                </a>
+                <a href="https://grocy.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Grocy</span>
+                    <span class="service-desc">Household Management</span>
+                </a>
+            </div>
+
+            <!-- Freddy Services -->
+            <div class="service-category">
+                <h2>🖥️ Freddy Services</h2>
+                <a href="https://photo.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Photo Gallery</span>
+                    <span class="service-desc">Photo Management</span>
+                </a>
+                <a href="https://nextcloud.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">NextCloud</span>
+                    <span class="service-desc">Cloud Storage & Office</span>
+                </a>
+                <a href="https://home.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Home Assistant</span>
+                    <span class="service-desc">Smart Home Hub</span>
+                </a>
+            </div>
+
+            <!-- Sync Services -->
+            <div class="service-category">
+                <h2>🔄 Sync Services</h2>
+                <a href="https://sync-sullivan.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Sullivan Sync</span>
+                    <span class="service-desc">File Synchronization</span>
+                </a>
+                <a href="https://sync-desktop.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Desktop Sync</span>
+                    <span class="service-desc">Desktop File Sync</span>
+                </a>
+                <a href="https://sync-freddy.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Freddy Sync</span>
+                    <span class="service-desc">Freddy File Sync</span>
+                </a>
+                <a href="https://sync-oryx.7gram.xyz" class="service-link" target="_blank">
+                    <span class="server-status"></span>
+                    <span class="service-name">Oryx Sync</span>
+                    <span class="service-desc">Oryx File Sync</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>🏠 Powered by Sullivan & Freddy Servers | Built with ❤️</p>
+        </div>
+    </div>
+
+    <script>
+        // Optional: Add service status checking
+        document.addEventListener('DOMContentLoaded', function() {
+            // You can add JavaScript here to check service availability
+            console.log('7gram.xyz Dashboard Loaded');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+;;
+;; Domain:     7gram.xyz
+;; Updated:    2025-10-02 for Cloudflare Import
+;; 
+;; Clean zone file ready for Cloudflare DNS import
+;;
+
+;; A Records
+;; Root Domain
+7gram.xyz	300	IN	A	100.73.41.1
+
+;; Host/Machine Records
+sullivan.7gram.xyz	300	IN	A	100.73.41.1
+freddy.7gram.xyz	300	IN	A	100.73.41.1
+oryx.7gram.xyz	300	IN	A	100.73.41.1
+desktop.7gram.xyz	300	IN	A	100.73.41.1
+desktop-win.7gram.xyz	300	IN	A	100.73.41.1
+
+;; Sullivan Media Services
+emby.7gram.xyz	300	IN	A	100.73.41.1
+plex.7gram.xyz	300	IN	A	100.73.41.1
+jellyfin.7gram.xyz	300	IN	A	100.73.41.1
+audiobooks.7gram.xyz	300	IN	A	100.73.41.1
+
+;; Sullivan Download Management
+qbt.7gram.xyz	300	IN	A	100.73.41.1
+jackett.7gram.xyz	300	IN	A	100.73.41.1
+sonarr.7gram.xyz	300	IN	A	100.73.41.1
+radarr.7gram.xyz	300	IN	A	100.73.41.1
+lidarr.7gram.xyz	300	IN	A	100.73.41.1
+
+;; Sullivan Books & Knowledge
+calibre-server.7gram.xyz	300	IN	A	100.73.41.1
+calibre.7gram.xyz	300	IN	A	100.73.41.1
+wiki.7gram.xyz	300	IN	A	100.73.41.1
+
+;; Sullivan Utilities
+filebot.7gram.xyz	300	IN	A	100.73.41.1
+yt.7gram.xyz	300	IN	A	100.73.41.1
+duplicati.7gram.xyz	300	IN	A	100.73.41.1
+mealie.7gram.xyz	300	IN	A	100.73.41.1
+grocy.7gram.xyz	300	IN	A	100.73.41.1
+
+;; Freddy Services
+photo.7gram.xyz	300	IN	A	100.73.41.1
+nextcloud.7gram.xyz	300	IN	A	100.73.41.1
+home.7gram.xyz	300	IN	A	100.73.41.1
+
+;; Sync Services (All Machines)
+sync-sullivan.7gram.xyz	120	IN	A	100.73.41.1
+sync-desktop.7gram.xyz	120	IN	A	100.73.41.1
+sync-freddy.7gram.xyz	120	IN	A	100.73.41.1
+sync-oryx.7gram.xyz	120	IN	A	100.73.41.1

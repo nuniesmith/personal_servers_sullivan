@@ -43,23 +43,35 @@ volumes:
   datadog_data:
 
 # Custom networks for service isolation
-#networks:
-#  frontend:
-#    driver: bridge
-#  media:
-#    driver: bridge
-#  download:
-#    driver: bridge
-#  books:
-#    driver: bridge
-#  database:
-#    driver: bridge
-#  monitoring:
-#    driver: bridge
-#  utilities:
-#    driver: bridge
+networks:
+  frontend:
+    driver: bridge
+  media:
+    driver: bridge
+  download:
+    driver: bridge
+  books:
+    driver: bridge
+  database:
+    driver: bridge
+  monitoring:
+    driver: bridge
+  utilities:
+    driver: bridge
 
 services:
+  # nginx reverse proxy
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    network_mode: host  # Accesses host-exposed ports like 127.0.0.1:8096
+    volumes:
+      - ./services/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./services/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./services/nginx/html:/dashboard:ro  # Mount dashboard files
+      - /etc/letsencrypt/live/7gram.xyz:/etc/nginx/ssl:ro  # Mount your certs
+    restart: unless-stopped
+
   # =============================================================================
   # MEDIA SERVICES
   # =============================================================================
@@ -93,13 +105,15 @@ services:
       - ${MEDIA_PATH_MUSIC:-/mnt/media/music}:/music
       - ${MEDIA_PATH_MUSIC_VIDEOS:-/mnt/media/music_videos}:/music_videos
       - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
-      - ${EMBY_BACKUP_PATH:-/mnt/media/backup/emby}:/backup
+      - ${EMBY_BACKUP_PATH:-/mnt/media/backup/emby}:/backup:rw
     devices:
       - /dev/dri:/dev/dri
     ports:
       - "8096:8096"
       - "8920:8920"
     restart: always
+    networks:
+      - media
 
   # jellyfin
   jellyfin:
@@ -135,6 +149,8 @@ services:
     ports:
       - "8097:8096"  # Changed from 8096 to avoid conflict with Emby
     restart: always
+    networks:
+      - media
 
   # plex
   plex:
@@ -178,6 +194,8 @@ services:
       - "32414:32414"
       - "32469:32469"
     restart: always
+    networks:
+      - media
 
   # audiobookshelf  
   audiobookshelf:
@@ -197,6 +215,8 @@ services:
       # MEDIA: Read-only books
       - ${MEDIA_PATH_BOOKS:-/mnt/media/books}:/books:ro
     restart: always
+    networks:
+      - books
 
   # calibre
   calibre:
@@ -217,6 +237,8 @@ services:
       - "8082:8080"
       - "8083:8081"
     restart: always
+    networks:
+      - books
 
   # calibre web
   calibre-web:
@@ -234,6 +256,8 @@ services:
     ports:
       - "8084:8083"
     restart: always
+    networks:
+      - books
 
   # =============================================================================
   # DOWNLOAD MANAGEMENT
@@ -252,7 +276,7 @@ services:
       # DATA: Application data and cache
       - qbittorrent_data:/config
       # DOWNLOADS: Active download directories
-      - ${DOWNLOAD_PATH_INCOMPLETE:-/mnt/media/qbittorrent/incomplete}:/incomplete
+      - ${DOWNLOAD_PATH_INCOMPLETE:-/media/qbittorrent/incomplete}:/incomplete
       - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
       - ${DOWNLOAD_PATH_TORRENT:-/mnt/media/qbittorrent/torrent}:/torrent
       - ${DOWNLOAD_PATH_MONITOR:-/mnt/media/monitor}:/monitor
@@ -264,6 +288,8 @@ services:
       - "8080:8080"
       - "60000:60000"
     restart: always
+    networks:
+      - download
 
   # jackett
   jackett:
@@ -280,6 +306,8 @@ services:
     ports:
       - "9117:9117"
     restart: always
+    networks:
+      - download
 
   # flaresolverr
   flaresolverr:
@@ -293,6 +321,8 @@ services:
     ports:
       - "${FLARESOLVERR_PORT:-8191}:8191"
     restart: always
+    networks:
+      - download  # Assuming it's used by indexers like Jackett
 
   # sonarr
   sonarr:
@@ -314,6 +344,8 @@ services:
     ports:
       - "8989:8989"
     restart: always
+    networks:
+      - download
 
   # radarr
   radarr:
@@ -335,7 +367,9 @@ services:
     ports:
       - "7878:7878"
     restart: always
-  
+    networks:
+      - download
+
   # lidarr
   lidarr:
     image: lscr.io/linuxserver/lidarr:latest
@@ -355,6 +389,8 @@ services:
     ports:
       - "8686:8686"
     restart: always
+    networks:
+      - download
 
   # unpackerr
   unpackerr:
@@ -404,6 +440,8 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: always
+    networks:
+      - download  # Needs to reach *arr services
 
   # doplarr
   doplarr:
@@ -432,6 +470,8 @@ services:
       - PARTIAL_SEASONS=true
       - LOG_LEVEL=:info
     restart: always
+    networks:
+      - download  # Depends on *arr services
 
   # =============================================================================
   # UTILITY SERVICES
@@ -461,6 +501,9 @@ services:
       - FILEBOT_NODE_AUTH_USER=${FILEBOT_USER}
       - FILEBOT_NODE_AUTH_PASS=${FILEBOT_PASSWORD}
     restart: always
+    networks:
+      - utilities
+      - download  # If it needs access to downloads
 
   # youtube-dl
   ytdl_material:
@@ -481,6 +524,9 @@ services:
     ports:
       - "8998:17442"
     restart: always
+    networks:
+      - utilities
+      - database  # For MongoDB access
 
   # duplicati
   duplicati:
@@ -499,6 +545,8 @@ services:
     ports:
       - "8200:8200"
     restart: always
+    networks:
+      - utilities
 
   # mealie
   mealie:
@@ -521,6 +569,8 @@ services:
     ports:
       - "9925:9000"
     restart: always
+    networks:
+      - utilities
 
   # grocy
   grocy:
@@ -536,6 +586,8 @@ services:
     ports:
       - "9283:80"
     restart: always
+    networks:
+      - utilities
 
   # syncthing - file synchronization
   syncthing:
@@ -557,6 +609,8 @@ services:
       - "22001:22000/udp"
       - "21028:21027/udp"
     restart: always
+    networks:
+      - utilities
 
   # wiki.js - knowledge management and documentation
   wiki:
@@ -578,6 +632,9 @@ services:
     ports:
       - "8090:3000"
     restart: always
+    networks:
+      - utilities
+      - database  # For Postgres access
 
   # =============================================================================
   # DATABASE SERVICES
@@ -593,6 +650,8 @@ services:
       # DATA: MongoDB data files
       - ytdl_mongodb:/data/db
     restart: always
+    networks:
+      - database
 
   # wiki-postgres - database for wiki.js
   wiki-postgres:
@@ -609,6 +668,8 @@ services:
     logging:
       driver: "none"
     restart: unless-stopped
+    networks:
+      - database
 
   # =============================================================================
   # MONITORING SERVICES
@@ -635,3 +696,5 @@ services:
     restart: always
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
+    networks:
+      - monitoring
