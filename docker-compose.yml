@@ -10,7 +10,6 @@ volumes:
   jellyfin_cache:
   plex_data:
   plex_cache:
-  audiobookshelf_data:
   calibre_data:
   calibre_web_data:
   
@@ -183,27 +182,6 @@ services:
     networks:
       - media
 
-  # audiobookshelf  
-  audiobookshelf:
-    image: ghcr.io/advplyr/audiobookshelf:latest
-    container_name: audiobookshelf
-    environment:
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
-      - TZ=${TZ:-America/Toronto}
-      - AUDIOBOOKSHELF_UID=${PUID:-1000}
-      - AUDIOBOOKSHELF_GID=${PGID:-100}
-    ports:
-      - "13378:80"
-    volumes:
-      # DATA: Database and metadata
-      - audiobookshelf_data:/metadata
-      # MEDIA: Read-only books
-      - ${MEDIA_PATH_BOOKS:-/mnt/media/books}:/books:ro
-    restart: always
-    networks:
-      - books
-
   # calibre
   calibre:
     image: lscr.io/linuxserver/calibre:latest
@@ -212,7 +190,7 @@ services:
       - seccomp:unconfined
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
     volumes:
       # DATA: Database and converted files
@@ -232,7 +210,7 @@ services:
     container_name: calibre-web
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
     volumes:
       # DATA: Application data
@@ -255,7 +233,7 @@ services:
     container_name: qbittorrent
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
       - WEBUI_PORT=8080
     volumes:
@@ -270,6 +248,8 @@ services:
       - ${MEDIA_PATH_SEED:-/mnt/media/seed}:/seed
       - ${MEDIA_PATH:-/mnt/media}:/media
       - ${MEDIA_PATH_EDU:-/mnt/media/edu}:/edu
+      - ${MEDIA_PATH_AUDIOBOOKS:-/media/audiobooks}:/audiobooks
+      - ${MEDIA_PATH_EBOOKS:-/mnt/media/books/ebooks}:/ebooks
     ports:
       - "8080:8080"
       - "60000:60000"
@@ -283,7 +263,7 @@ services:
     container_name: jackett
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
       - AUTO_UPDATE=true
     volumes:
@@ -316,7 +296,7 @@ services:
     container_name: sonarr
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
     volumes:
       # DATA: Database and logs
@@ -339,7 +319,7 @@ services:
     container_name: radarr
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
     volumes:
       # DATA: Database and logs
@@ -362,7 +342,7 @@ services:
     container_name: lidarr
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
     volumes:
       # DATA: Database and logs
@@ -386,7 +366,7 @@ services:
       # DOWNLOADS: Working directories
       - ${MEDIA_PATH:-/mnt/media}:/media
       - ${DOWNLOAD_PATH_COMPLETE:-/mnt/media/qbittorrent/complete}:/complete
-    user: ${PUID:-1000}:${PGID:-100}
+    user: ${PUID:-1000}:${PGID:-1000}
     environment:
       - TZ=${TZ:-America/Toronto}
       - UN_DEBUG=false
@@ -438,7 +418,7 @@ services:
       - sonarr
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
       - DISCORD__TOKEN=${DISCORD_TOKEN}
       - RADARR__API=${RADARR_API_KEY}
@@ -481,7 +461,7 @@ services:
       - "5452:5452"
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
       - FILEBOT_NODE_AUTH=BASIC
       - FILEBOT_NODE_AUTH_USER=${FILEBOT_USER}
@@ -520,8 +500,9 @@ services:
     container_name: duplicati
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
+      - SETTINGS_ENCRYPTION_KEY=${DUPLICATI_ENCRYPTION_KEY}
     volumes:
       # DATA: Application data
       - duplicati_data:/config
@@ -540,7 +521,7 @@ services:
     container_name: mealie
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
       - ALLOW_SIGNUP=true
       - PGUSERDB=mealie
@@ -564,7 +545,7 @@ services:
     container_name: grocy
     environment:
       - PUID=${PUID:-1000}
-      - PGID=${PGID:-100}
+      - PGID=${PGID:-1000}
       - TZ=${TZ:-America/Toronto}
     volumes:
       # DATA: Application data
@@ -590,10 +571,10 @@ services:
       - ${SYNCTHING_MEDIA_PATH:-/mnt/media}:/sync/media
       - ${SYNCTHING_DOWNLOADS_PATH:-/mnt/media/qbittorrent}:/sync/downloads
     ports:
-      - "8385:8384"  # Different port to avoid conflict with Freddy
-      - "22001:22000/tcp"
-      - "22001:22000/udp"
-      - "21028:21027/udp"
+      - "8384:8384"
+      - "22000:22000/tcp"
+      - "22000:22000/udp"
+      - "21027:21027/udp"
     restart: always
     networks:
       - utilities

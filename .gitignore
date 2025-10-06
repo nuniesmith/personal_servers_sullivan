@@ -309,3 +309,5 @@ file_contents.txt
 codebase_analysis_report_*/
 codebase-analysis-report*/
 perf.json
+
+services/audiobookshelf/config/migrations/*
