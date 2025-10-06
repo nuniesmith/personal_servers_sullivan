@@ -21,16 +21,14 @@ PROJECT_ROOT="$SCRIPT_DIR"
 SERVICES=(
 	# Database services (must start first)
 	"ytdl-mongo-db" "wiki-postgres"
-	# AI services
-	"ollama" "open-webui"
 	# Download infrastructure
 	"qbittorrent" "jackett" "flaresolverr"
 	# Media management (ARR stack - depends on qbittorrent/jackett)
-	"sonarr" "radarr" "lidarr" "readarr.audio" "readarr.ebooks"
+	"sonarr" "radarr" "lidarr"
 	# Post-processing (depends on ARR stack)
 	"unpackerr" "doplarr"
 	# Media servers
-	"emby" "jellyfin" "plex" "audiobookshelf"
+	"emby" "jellyfin" "plex"
 	# Book management
 	"calibre" "calibre-web"
 	# Utility services
@@ -451,106 +449,64 @@ stop_stack() {
 
 health_checks() {
     local target_services=("${@}")
-	log INFO "Running quick health checks for ${target_services[*]}..."
+	log INFO "Running health checks for ${target_services[*]}..."
+	
+	# Map service names to container names
+	declare -A service_to_container
+	service_to_container["ytdl-mongo-db"]="mongo-db"
+	service_to_container["wiki-postgres"]="wiki-postgres"
+	service_to_container["syncthing"]="syncthing_sullivan"
+	
+	local all_healthy=true
+	
 	for service in "${target_services[@]}"; do
-		case "$service" in
-			# Media Services
-			emby)
-				if curl -fsS http://localhost:8096 >/dev/null 2>&1; then
-					log INFO "Emby: http://localhost:8096"
+		# Get container name (use mapping or service name)
+		local container_name="${service_to_container[$service]:-$service}"
+		
+		# Check if container exists
+		if ! docker ps --format '{{.Names}}' | grep -q "^${container_name}$"; then
+			log WARN "$service: container not running"
+			all_healthy=false
+			continue
+		fi
+		
+		# Check Docker health status if available
+		local health_status
+		health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "none")
+		
+		case "$health_status" in
+			healthy)
+				log INFO "$service: healthy"
+				;;
+			starting)
+				log WARN "$service: still starting (healthcheck in progress)"
+				all_healthy=false
+				;;
+			unhealthy)
+				log ERROR "$service: unhealthy"
+				all_healthy=false
+				;;
+			none)
+				# No healthcheck defined, just check if container is running
+				if docker ps --filter "name=^${container_name}$" --filter "status=running" | grep -q "$container_name"; then
+					log INFO "$service: running (no healthcheck)"
 				else
-					log WARN "Emby not reachable yet"
+					log WARN "$service: not running"
+					all_healthy=false
 				fi
 				;;
-			jellyfin)
-				if curl -fsS http://localhost:8097 >/dev/null 2>&1; then
-					log INFO "Jellyfin: http://localhost:8097"
-				else
-					log WARN "Jellyfin not reachable yet"
-				fi
-				;;
-			plex)
-				if curl -fsS http://localhost:32400/web >/dev/null 2>&1; then
-					log INFO "Plex: http://localhost:32400"
-				else
-					log WARN "Plex not reachable yet"
-				fi
-				;;
-			audiobookshelf)
-				if curl -fsS http://localhost:13378 >/dev/null 2>&1; then
-					log INFO "Audiobookshelf: http://localhost:13378"
-				else
-					log WARN "Audiobookshelf not reachable yet"
-				fi
-				;;
-			# Download Management
-			qbittorrent)
-				if curl -fsS http://localhost:8080 >/dev/null 2>&1; then
-					log INFO "qBittorrent: http://localhost:8080"
-				else
-					log WARN "qBittorrent not reachable yet"
-				fi
-				;;
-			sonarr)
-				if curl -fsS http://localhost:8989 >/dev/null 2>&1; then
-					log INFO "Sonarr: http://localhost:8989"
-				else
-					log WARN "Sonarr not reachable yet"
-				fi
-				;;
-			radarr)
-				if curl -fsS http://localhost:7878 >/dev/null 2>&1; then
-					log INFO "Radarr: http://localhost:7878"
-				else
-					log WARN "Radarr not reachable yet"
-				fi
-				;;
-			lidarr)
-				if curl -fsS http://localhost:8686 >/dev/null 2>&1; then
-					log INFO "Lidarr: http://localhost:8686"
-				else
-					log WARN "Lidarr not reachable yet"
-				fi
-				;;
-			jackett)
-				if curl -fsS http://localhost:9117 >/dev/null 2>&1; then
-					log INFO "Jackett: http://localhost:9117"
-				else
-					log WARN "Jackett not reachable yet"
-				fi
-				;;
-			# Utility Services
-			mealie)
-				if curl -fsS http://localhost:9925 >/dev/null 2>&1; then
-					log INFO "Mealie: http://localhost:9925"
-				else
-					log WARN "Mealie not reachable yet"
-				fi
-				;;
-			wiki)
-				if curl -fsS http://localhost:8090 >/dev/null 2>&1; then
-					log INFO "Wiki.js: http://localhost:8090"
-				else
-					log WARN "Wiki.js not reachable yet"
-				fi
-				;;
-			# Database checks
-			wiki-postgres)
-				if docker exec wiki-postgres pg_isready -U wikijs >/dev/null 2>&1; then
-					log INFO "Wiki Postgres: healthy"
-				else
-					log WARN "Wiki Postgres not ready yet"
-				fi
-				;;
-			ytdl-mongo-db)
-				if docker exec mongo-db mongosh --eval "db.runCommand('ping')" >/dev/null 2>&1; then
-					log INFO "MongoDB: healthy"
-				else
-					log WARN "MongoDB not ready yet"
-				fi
+			*)
+				log WARN "$service: unknown health status ($health_status)"
+				all_healthy=false
 				;;
 		esac
 	done
+	
+	if $all_healthy; then
+		log INFO "All services are healthy!"
+	else
+		log WARN "Some services are not yet healthy. Use 'docker compose ps' to check status."
+	fi
 }
 
 usage() {
@@ -559,8 +515,8 @@ SULLIVAN startup script - Media & Intensive Services
 
 Usage: $(basename "$0") [options] [service]
 	service: all (default) or specific services like:
-	  Media: emby, jellyfin, plex, audiobookshelf, calibre, calibre-web
-	  Downloads: qbittorrent, jackett, sonarr, radarr, lidarr, readarr.audio, readarr.ebooks
+	  Media: emby, jellyfin, plex, calibre, calibre-web
+	  Downloads: qbittorrent, jackett, sonarr, radarr, lidarr
 	  Utils: mealie, wiki, grocy, syncthing, duplicati, filebot-node, ytdl_material
 	  Databases: ytdl-mongo-db, wiki-postgres
 	  Monitoring: watchtower
@@ -643,12 +599,15 @@ main() {
 
 	log INFO "Done. SULLIVAN services started successfully!"
 	echo ""
+	echo "=== Service Health Status ==="
+	local cmd_args; cmd_args=$(build_compose_cmd "${target_services[@]}")
+	$COMPOSE_CMD $cmd_args ps
+	echo ""
 	echo "=== Common Service Endpoints ==="
 	echo "Media Servers:"
 	echo "  Emby:            http://localhost:8096"
 	echo "  Jellyfin:        http://localhost:8097"
 	echo "  Plex:            http://localhost:32400"
-	echo "  Audiobookshelf:  http://localhost:13378"
 	echo ""
 	echo "Download Management:"
 	echo "  qBittorrent:     http://localhost:8080"
@@ -662,6 +621,9 @@ main() {
 	echo "  Wiki.js:         http://localhost:8090"
 	echo "  Grocy:           http://localhost:9283"
 	echo "  Duplicati:       http://localhost:8200"
+	echo "  Syncthing:       http://localhost:8384"
+	echo ""
+	echo "Use 'docker compose ps' to check health status at any time."
 }
 
 main "$@"
